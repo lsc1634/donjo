@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>리얼타임 출근 타이머 (기본 시급 기준)</title>
+    <title>리얼타임 라이프 자산 타이머</title>
     <style>
         body {
             font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -20,7 +20,7 @@
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.08);
             text-align: center;
-            width: 420px;
+            width: 440px;
         }
         .badge {
             background-color: #e8f5e9;
@@ -38,25 +38,31 @@
             margin: 0 0 15px 0;
             font-weight: 500;
         }
-        .time-picker-box {
+        .input-box {
             background: #f9f9f9;
-            padding: 12px;
+            padding: 15px;
             border-radius: 12px;
             margin-bottom: 20px;
             font-size: 14px;
             color: #555;
             display: flex;
-            justify-content: center;
-            align-items: center;
+            flex-direction: column;
             gap: 10px;
+            align-items: center;
         }
-        .time-picker-box input {
-            padding: 5px 8px;
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .input-box input {
+            padding: 6px 10px;
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 14px;
-            font-family: inherit;
             color: #333;
+            text-align: right;
+            width: 140px;
         }
         .money-display {
             font-size: 38px;
@@ -68,58 +74,47 @@
         .sub-text {
             font-size: 13px;
             color: #888;
-            margin-bottom: 15px;
-        }
-        .lunch-badge {
-            font-size: 12px;
-            color: #d32f2f;
-            background-color: #ffebee;
-            padding: 4px 10px;
-            border-radius: 6px;
-            display: inline-block;
-            margin-bottom: 15px;
-            font-weight: bold;
+            margin-bottom: 20px;
         }
         .timer-display {
-            font-size: 15px;
-            color: #444;
+            font-size: 14px;
+            color: #666;
             background: #edf2f7;
             padding: 12px;
             border-radius: 10px;
             font-family: monospace;
-            font-weight: bold;
+            line-height: 1.5;
         }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <div class="badge">지방 공기업 리얼타임 자산기 💼</div>
-    <h1>오늘 출근 이후 벌어들인 돈</h1>
+    <div class="badge">실시간 라이프 자산 타이머 ⏳</div>
+    <h1 id="title-year">올해 내가 살아가며 벌고 있는 돈</h1>
     
-    <div class="time-picker-box">
-        <label for="work-time">출근 시간 설정 :</label>
-        <input type="time" id="work-time" value="09:00" onchange="initTimer()">
+    <div class="input-box">
+        <div class="input-row">
+            <label for="salary-input">나의 세전 연봉 :</label>
+            <input type="number" id="salary-input" value="36020000" step="10000" oninput="saveAndCalculate()">
+            <span>원</span>
+        </div>
     </div>
     
     <div class="money-display" id="money">0원</div>
     
-    <div class="sub-text">근무 시간 초당 <span style="color:#2e7d32; font-weight:bold;">3.13원</span> 획득 중</div>
+    <div class="sub-text">숨만 쉬어도 초당 <span id="per-second-text" style="color:#2e7d32; font-weight:bold;">0.00원</span> 축적 중</div>
     
-    <div id="status-message" class="lunch-badge" style="display: none;">현재 무급 휴게 시간입니다 (타이머 일시정지)</div>
-    
-    <div class="timer-display" id="timer">실제 근무 시간: 00시간 00분 00초 째</div>
+    <div class="timer-display" id="timer">
+        올해 경과 시간: 00일 00시간 00분 00초<br>
+        (1월 1일 00:00:00 기준)
+    </div>
 </div>
 
 <script>
-    // 유저님의 기본 시급 반영 (11,267원)
-    // 11,267원 / 3600초 = 약 3.12972원 (초당 가치)
-    const earningsPerSecond = 3.12972; 
-    
-    let targetTime = null;
-    let startHour = 9;
+    let earningsPerSecond = 0;
 
-    // 접속한 기기의 한국 시간(KST)을 가져오는 함수
+    // 브라우저의 한국 시간(KST)을 계산하는 함수
     function getKSTDate() {
         const curr = new Date();
         const utc = curr.getTime() + (curr.getTimezoneOffset() * 60 * 1000);
@@ -127,79 +122,59 @@
         return new Date(utc + KR_TIME_DIFF);
     }
 
-    function initTimer() {
-        const timeVal = document.getElementById('work-time').value; // "09:00" 형태
-        const [hours, minutes] = timeVal.split(':');
-        startHour = parseInt(hours);
+    // 데이터를 저장하고 초당 가치를 재계산하는 함수
+    function saveAndCalculate() {
+        const salaryInput = document.getElementById('salary-input').value;
+        const salary = parseFloat(salaryInput) || 0;
         
-        const now = getKSTDate();
-        targetTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
+        // 로컬 스토리지에 연봉 저장 (킵 기능)
+        localStorage.setItem('userSalary', salary);
+
+        // 365일 24시간 기준 초당 가치 계산 (윤년 고려 없이 365일 기준)
+        // 365일 * 24시간 * 60분 * 60초 = 31,536,000초
+        earningsPerSecond = salary / 31536000;
+
+        // 안내 텍스트 업데이트
+        document.getElementById('per-second-text').innerText = earningsPerSecond.toFixed(4) + '원';
+    }
+
+    // 처음에 저장된 연봉 불러오기
+    function loadSavedSalary() {
+        const savedSalary = localStorage.getItem('userSalary');
+        if (savedSalary !== null) {
+            document.getElementById('salary-input').value = savedSalary;
+        }
+        saveAndCalculate();
     }
 
     function updateTimer() {
-        if (!targetTime) return;
-
         const now = getKSTDate();
-        let elapsedTimeInSeconds = (now - targetTime) / 1000;
+        const currentYear = now.getFullYear();
+        
+        // 제목에 현재 연도 표시
+        document.getElementById('title-year').innerText = `${currentYear}년 내가 살아가며 벌고 있는 돈`;
 
-        if (elapsedTimeInSeconds < 0) {
-            elapsedTimeInSeconds = 0;
-        }
+        // 올해 1월 1일 00:00:00 KST 기준점 설정
+        const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0);
+        
+        // 올해 1월 1일부터 지금까지 흐른 총 시간 (초 단위)
+        const elapsedTimeInSeconds = (now - startOfYear) / 1000;
 
-        // 오늘 날짜의 무급 휴게시간 기준점 설정
-        const lunchStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
-        const lunchEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 13, 0, 0);
-        const dinnerStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 17, 0, 0);
-        const dinnerEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0);
-
-        let penaltySeconds = 0;
-        let isBreakTime = false;
-
-        // 1. 오전 출근 (12시 이전 출근) -> 점심시간(12~13시) 무급 처리
-        if (startHour < 12) {
-            if (now >= lunchStart && now < lunchEnd) {
-                penaltySeconds = (now - lunchStart) / 1000;
-                isBreakTime = true;
-            } else if (now >= lunchEnd) {
-                penaltySeconds = 3600;
-            }
-        } 
-        // 2. 오후 출근 (12시~17시 사이 출근) -> 저녁시간(17~18시) 무급 처리
-        else if (startHour >= 12 && startHour < 17) {
-            if (now >= dinnerStart && now < dinnerEnd) {
-                penaltySeconds = (now - dinnerStart) / 1000;
-                isBreakTime = true;
-            } else if (now >= dinnerEnd) {
-                penaltySeconds = 3600;
-            }
-        }
-
-        // 전체 흐른 시간에서 무급 휴게 시간을 제외하여 실제 근무 시간 계산
-        let realWorkingSeconds = elapsedTimeInSeconds - penaltySeconds;
-        if (realWorkingSeconds < 0) realWorkingSeconds = 0;
-
-        // UI 업데이트 (무급 시간 안내 배지)
-        const statusMsg = document.getElementById('status-message');
-        if (isBreakTime) {
-            statusMsg.style.display = 'inline-block';
-        } else {
-            statusMsg.style.display = 'none';
-        }
-
-        // 1. 실제 근무 초에 기본 시급 기준 초당 가치 곱하기
-        const accumulatedMoney = realWorkingSeconds * earningsPerSecond;
+        // 1. 올해 시작 이후 실시간 누적 금액 계산
+        const accumulatedMoney = elapsedTimeInSeconds * earningsPerSecond;
         document.getElementById('money').innerText = accumulatedMoney.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 원';
 
-        // 2. 실제 근무 시간 표시
-        const hrs = Math.floor(realWorkingSeconds / 3600).toString().padStart(2, '0');
-        const mins = Math.floor((realWorkingSeconds % 3600) / 60).toString().padStart(2, '0');
-        const secs = Math.floor(realWorkingSeconds % 60).toString().padStart(2, '0');
+        // 2. 올해 경과 시간 포맷팅
+        const days = Math.floor(elapsedTimeInSeconds / 86400);
+        const hrs = Math.floor((elapsedTimeInSeconds % 86400) / 3600).toString().padStart(2, '0');
+        const mins = Math.floor((elapsedTimeInSeconds % 3600) / 60).toString().padStart(2, '0');
+        const secs = Math.floor(elapsedTimeInSeconds % 60).toString().padStart(2, '0');
         
-        document.getElementById('timer').innerText = `실제 근무 시간: ${hrs}시간 ${mins}분 ${secs}초 째`;
+        document.getElementById('timer').innerHTML = `올해 경과 시간: ${days}일 ${hrs}시간 ${mins}분 ${secs}초째<br>(1월 1일 00:00:00 기준)`;
     }
 
-    // 초기 구동
-    initTimer();
+    // 초기화 및 루프 구동
+    loadSavedSalary();
     setInterval(updateTimer, 100);
 </script>
 
