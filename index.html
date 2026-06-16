@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>리얼타임 출근 타이머 (진짜 시급 기준)</title>
+    <title>리얼타임 출근 타이머 (기본 시급 기준)</title>
     <style>
         body {
             font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -97,28 +97,24 @@
     <div class="badge">지방 공기업 리얼타임 자산기 💼</div>
     <h1>오늘 출근 이후 벌어들인 돈</h1>
     
-    <!-- 출근 시간 설정 UI -->
     <div class="time-picker-box">
         <label for="work-time">출근 시간 설정 :</label>
         <input type="time" id="work-time" value="09:00" onchange="initTimer()">
     </div>
     
-    <!-- 현재까지 누적된 실시간 금액 -->
     <div class="money-display" id="money">0원</div>
     
-    <div class="sub-text">근무 시간 초당 <span style="color:#2e7d32; font-weight:bold;">3.62원</span> 획득 중</div>
+    <div class="sub-text">근무 시간 초당 <span style="color:#2e7d32; font-weight:bold;">3.13원</span> 획득 중</div>
     
-    <!-- 휴게 시간 알림 (점심/저녁) -->
     <div id="status-message" class="lunch-badge" style="display: none;">현재 무급 휴게 시간입니다 (타이머 일시정지)</div>
     
-    <!-- 출근 후 경과 시간 -->
     <div class="timer-display" id="timer">실제 근무 시간: 00시간 00분 00초 째</div>
 </div>
 
 <script>
-    // 유저님의 최종 통합 시급 반영 (13,037원)
-    // 13,037원 / 3600초 = 약 3.62139원 (초당 가치)
-    const earningsPerSecond = 3.62139; 
+    // 유저님의 기본 시급 반영 (11,267원)
+    // 11,267원 / 3600초 = 약 3.12972원 (초당 가치)
+    const earningsPerSecond = 3.12972; 
     
     let targetTime = null;
     let startHour = 9;
@@ -190,7 +186,7 @@
             statusMsg.style.display = 'none';
         }
 
-        // 1. 실제 흐른 초에 초당 가치를 바로 곱하여 누적 오류 원천 차단
+        // 1. 실제 근무 초에 기본 시급 기준 초당 가치 곱하기
         const accumulatedMoney = realWorkingSeconds * earningsPerSecond;
         document.getElementById('money').innerText = accumulatedMoney.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 원';
 
