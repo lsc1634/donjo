@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>리얼타임 출근 타이머</title>
+    <title>리얼타임 출근 타이머 (KST 기준)</title>
     <style>
         body {
             font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -20,7 +20,7 @@
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.08);
             text-align: center;
-            width: 400px;
+            width: 420px;
         }
         .badge {
             background-color: #e8f5e9;
@@ -68,7 +68,17 @@
         .sub-text {
             font-size: 13px;
             color: #888;
-            margin-bottom: 25px;
+            margin-bottom: 15px;
+        }
+        .lunch-badge {
+            font-size: 12px;
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: inline-block;
+            margin-bottom: 15px;
+            font-weight: bold;
         }
         .timer-display {
             font-size: 15px;
@@ -98,8 +108,11 @@
     
     <div class="sub-text">숨만 쉬어도 초당 <span style="color:#2e7d32; font-weight:bold;">1.14원</span> 획득 중</div>
     
+    <!-- 휴게 시간 알림 (점심/저녁) -->
+    <div id="status-message" class="lunch-badge" style="display: none;">현재 무급 휴게 시간입니다 (타이머 일시정지)</div>
+    
     <!-- 출근 후 경과 시간 -->
-    <div class="timer-display" id="timer">출근한 지: 00시간 00분 00초 째</div>
+    <div class="timer-display" id="timer">실제 근무 시간: 00시간 00분 00초 째</div>
 </div>
 
 <script>
@@ -108,41 +121,92 @@
     const earningsPerSecond = 1.14217; 
     
     let targetTime = null;
+    let startHour = 9;
+
+    // 접속한 기기의 한국 시간(KST)을 가져오는 함수
+    function getKSTDate() {
+        const curr = new Date();
+        const utc = curr.getTime() + (curr.getTimezoneOffset() * 60 * 1000);
+        const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
+        return new Date(utc + KR_TIME_DIFF);
+    }
 
     function initTimer() {
         const timeVal = document.getElementById('work-time').value; // "09:00" 형태
         const [hours, minutes] = timeVal.split(':');
+        startHour = parseInt(hours);
         
-        // 오늘 날짜의 해당 시간으로 Date 객체 생성
-        const now = new Date();
+        const now = getKSTDate();
         targetTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
     }
 
     function updateTimer() {
         if (!targetTime) return;
 
-        const now = new Date();
-        // 출근 시간과 현재 시간의 차이 (초 단위)
+        const now = getKSTDate();
         let elapsedTimeInSeconds = (now - targetTime) / 1000;
 
-        // 만약 설정한 출근 시간이 현재 시간보다 미래라면 0으로 처리
         if (elapsedTimeInSeconds < 0) {
             elapsedTimeInSeconds = 0;
         }
 
-        // 1. 출근 이후 누적 금액 계산 및 표시
-        const accumulatedMoney = elapsedTimeInSeconds * earningsPerSecond;
+        // 오늘 날짜의 무급 휴게시간 기준점 설정
+        const lunchStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+        const lunchEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 13, 0, 0);
+        const dinnerStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 17, 0, 0);
+        const dinnerEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0);
+
+        let penaltySeconds = 0;
+        let isBreakTime = false;
+
+        // 1. 오전 출근 (12시 이전 출근) -> 점심시간(12~13시) 무급 처리
+        if (startHour < 12) {
+            if (now >= lunchStart && now < lunchEnd) {
+                // 현재 점심시간 진행 중인 경우 -> 12시 정각까지만 일한 것으로 고정
+                penaltySeconds = (now - lunchStart) / 1000;
+                isBreakTime = true;
+            } else if (now >= lunchEnd) {
+                // 점심시간이 완전히 지난 경우 -> 통째로 1시간(3600초) 차감
+                penaltySeconds = 3600;
+            }
+        } 
+        // 2. 오후 출근 (12시~17시 사이 출근) -> 저녁시간(17~18시) 무급 처리
+        else if (startHour >= 12 && startHour < 17) {
+            if (now >= dinnerStart && now < dinnerEnd) {
+                // 현재 저녁시간 진행 중인 경우 -> 17시 정각까지만 일한 것으로 고정
+                penaltySeconds = (now - dinnerStart) / 1000;
+                isBreakTime = true;
+            } else if (now >= dinnerEnd) {
+                // 저녁시간이 완전히 지난 경우 -> 통째로 1시간(3600초) 차감
+                penaltySeconds = 3600;
+            }
+        }
+
+        // 전체 흐른 시간에서 무급 휴게 시간을 제외하여 실제 근무 시간 계산
+        let realWorkingSeconds = elapsedTimeInSeconds - penaltySeconds;
+        if (realWorkingSeconds < 0) realWorkingSeconds = 0;
+
+        // UI 업데이트 (무급 시간 안내 배지)
+        const statusMsg = document.getElementById('status-message');
+        if (isBreakTime) {
+            statusMsg.style.display = 'inline-block';
+        } else {
+            statusMsg.style.display = 'none';
+        }
+
+        // 1. 누적 금액 표시
+        const accumulatedMoney = realWorkingSeconds * earningsPerSecond;
         document.getElementById('money').innerText = accumulatedMoney.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 원';
 
-        // 2. 출근 후 경과 시간 계산
-        const hrs = Math.floor(elapsedTimeInSeconds / 3600).toString().padStart(2, '0');
-        const mins = Math.floor((elapsedTimeInSeconds % 3600) / 60).toString().padStart(2, '0');
-        const secs = Math.floor(elapsedTimeInSeconds % 60).toString().padStart(2, '0');
+        // 2. 실제 근무 시간 표시
+        const hrs = Math.floor(realWorkingSeconds / 3600).toString().padStart(2, '0');
+        const mins = Math.floor((realWorkingSeconds % 3600) / 60).toString().padStart(2, '0');
+        const secs = Math.floor(realWorkingSeconds % 60).toString().padStart(2, '0');
         
-        document.getElementById('timer').innerText = `출근한 지: ${hrs}시간 ${mins}분 ${secs}초 째`;
+        document.getElementById('timer').innerText = `실제 근무 시간: ${hrs}시간 ${mins}분 ${secs}초 째`;
     }
 
-    // 페이지가 열릴 때 초기 세팅 및 타이머 구동
+    // 초기 구동
     initTimer();
     setInterval(updateTimer, 100);
 </script>
