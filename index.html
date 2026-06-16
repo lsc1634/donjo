@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>공기업 커리어 누적 자산 타이머</title>
+    <title>커리어 누적 자산 타이머</title>
     <style>
         body {
             font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -83,12 +83,17 @@
             width: 120px;
         }
         .money-display {
-            font-size: 36px;
+            font-size: 38px;
             font-weight: 800;
             color: #1b5e20;
             margin-bottom: 8px;
             font-variant-numeric: tabular-nums;
             word-break: break-all;
+        }
+        .decimal-point {
+            font-size: 22px;
+            color: #81c784;
+            font-weight: 500;
         }
         .sub-text {
             font-size: 13px;
@@ -109,13 +114,13 @@
 <body>
 
 <div class="card">
-    <div class="badge">지방 공기업 누적 자산 트래커 💼</div>
+    <div class="badge">실시간 회사 누적 자산 트래커 💼</div>
     <h1>입사 이후 내가 총 벌어들인 돈</h1>
     
     <div class="setting-box">
         <div class="setting-row">
-            <label for="start-date">🗓 입사 년/월 설정:</label>
-            <input type="month" id="start-date" value="2024-01" onchange="onStartDateChange()">
+            <label for="start-date">🗓 입사 연/월/일 설정:</label>
+            <input type="date" id="start-date" value="2024-01-01" onchange="onStartDateChange()">
         </div>
         
         <div id="salary-list" class="salary-list">
@@ -124,7 +129,7 @@
     
     <div class="money-display" id="money">0원</div>
     
-    <div class="sub-text">현재(2026년) 연봉 기준 초당 <span id="per-second-text" style="color:#2e7d32; font-weight:bold;">0.00원</span> 상승 중</div>
+    <div class="sub-text">현재 연봉 기준 초당 <span id="per-second-text" style="color:#2e7d32; font-weight:bold;">0.00원</span> 상승 중</div>
     
     <div class="timer-display" id="timer">
         내 커리어 총 경과 시간 계산 중...
@@ -132,7 +137,6 @@
 </div>
 
 <script>
-    // 한국 시간(KST) 구하기
     function getKSTDate() {
         const curr = new Date();
         const utc = curr.getTime() + (curr.getTimezoneOffset() * 60 * 1000);
@@ -140,26 +144,22 @@
         return new Date(utc + KR_TIME_DIFF);
     }
 
-    const SECONDS_PER_YEAR = 31536000; // 365일 기준 초
+    const SECONDS_PER_YEAR = 31536000;
 
-    // 페이지 로드 시 초기화
     window.onload = function() {
-        // 1. 기존 저장 데이터 복원 (없으면 기본값 2024-01)
-        const savedStartDate = localStorage.getItem('careerStartDate') || '2024-01';
+        const savedStartDate = localStorage.getItem('careerStartDateDay') || '2024-01-01';
         document.getElementById('start-date').value = savedStartDate;
 
         renderSalaryInputs();
         setInterval(updateTimer, 100);
     };
 
-    // 입사일 변경 시 호출
     function onStartDateChange() {
         const startDateVal = document.getElementById('start-date').value;
-        localStorage.setItem('careerStartDate', startDateVal);
+        localStorage.setItem('careerStartDateDay', startDateVal);
         renderSalaryInputs();
     }
 
-    // 입사 연도부터 현재 연도(2026년)까지 연봉 입력창을 동적으로 생성
     function renderSalaryInputs() {
         const startDateVal = document.getElementById('start-date').value;
         if (!startDateVal) return;
@@ -169,11 +169,9 @@
         const container = document.getElementById('salary-list');
         container.innerHTML = '';
 
-        // 로컬스토리지에서 기존 연봉 데이터 가져오기
-        let savedSalaries = JSON.parse(localStorage.getItem('careerSalaries')) || {};
+        let savedSalaries = JSON.parse(localStorage.getItem('careerSalariesDay')) || {};
 
         for (let y = startYear; y <= currentYear; y++) {
-            // 기본값 설정 (값 없으면 유저님의 현재 기본 연봉 36,020,000원으로 세팅)
             if (savedSalaries[y] === undefined) {
                 savedSalaries[y] = 36020000; 
             }
@@ -189,10 +187,9 @@
             `;
             container.appendChild(item);
         }
-        localStorage.setItem('careerSalaries', JSON.stringify(savedSalaries));
+        localStorage.setItem('careerSalariesDay', JSON.stringify(savedSalaries));
     }
 
-    // 연봉 입력 시 로컬스토리지에 실시간 저장
     function saveSalaries() {
         const startDateVal = document.getElementById('start-date').value;
         if (!startDateVal) return;
@@ -206,41 +203,36 @@
             salaries[y] = parseFloat(val) || 0;
         }
 
-        localStorage.setItem('careerSalaries', JSON.stringify(salaries));
+        localStorage.setItem('careerSalariesDay', JSON.stringify(salaries));
     }
 
-    // 실시간 타이머 핵심 계산 로직
     function updateTimer() {
         const startDateVal = document.getElementById('start-date').value;
         if (!startDateVal) return;
 
-        const [startYearStr, startMonthStr] = startDateVal.split('-');
+        const [startYearStr, startMonthStr, startDayStr] = startDateVal.split('-');
         const startYear = parseInt(startYearStr);
         const startMonth = parseInt(startMonthStr);
+        const startDay = parseInt(startDayStr);
 
         const now = getKSTDate();
         const currentYear = now.getFullYear();
 
-        // 입사일 정각(1일 00:00:00) 기준점 객체 생성
-        const careerStart = new Date(startYear, startMonth - 1, 1, 0, 0, 0);
+        const careerStart = new Date(startYear, startMonth - 1, startDay, 0, 0, 0);
         
         if (now < careerStart) {
-            document.getElementById('money').innerText = '0.00 원';
+            document.getElementById('money').innerHTML = '0<span class="decimal-point">.00</span> 원';
             document.getElementById('timer').innerText = '입사일이 현재보다 미래입니다.';
             return;
         }
 
-        // 저장된 연봉 데이터
-        const salaries = JSON.parse(localStorage.getItem('careerSalaries')) || {};
-
+        const salaries = JSON.parse(localStorage.getItem('careerSalariesDay')) || {};
         let totalEarned = 0;
 
-        // 1. 지나간 연도들의 총 수령액 계산
         for (let y = startYear; y < currentYear; y++) {
             const annualSalary = salaries[y] || 0;
 
             if (y === startYear) {
-                // 입사한 첫해: 입사 월부터 12월 말일까지의 비율 계산
                 const yearStart = new Date(y, 0, 1, 0, 0, 0);
                 const yearEnd = new Date(y, 11, 31, 23, 59, 59);
                 const totalSecsInYear = (yearEnd - yearStart) / 1000;
@@ -248,34 +240,34 @@
                 
                 totalEarned += (annualSalary / totalSecsInYear) * workedSecsInFirstYear;
             } else {
-                // 완전히 꽉 채워 일한 중간 연도들
                 totalEarned += annualSalary;
             }
         }
 
-        // 2. 올해(현재 연도) 실시간으로 벌고 있는 금액 계산
         const currentYearSalary = salaries[currentYear] || 0;
         const currentYearStart = new Date(currentYear, 0, 1, 0, 0, 0);
         
-        // 만약 올해 입사했다면 기준점은 1월 1일이 아니라 입사일이 됨
         const thisYearBasis = (startYear === currentYear) ? careerStart : currentYearStart;
         const thisYearElapsedSeconds = (now - thisYearBasis) / 1000;
         
         const currentEarningsPerSecond = currentYearSalary / SECONDS_PER_YEAR;
         totalEarned += thisYearElapsedSeconds * currentEarningsPerSecond;
 
-        // 3. UI 업데이트 (총 누적 금액 및 초당 가치 표시)
-        document.getElementById('money').innerText = totalEarned.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 원';
+        const formattedNum = totalEarned.toFixed(2);
+        const [integerPart, decimalPart] = formattedNum.split('.');
+        const commaInteger = parseInt(integerPart).toLocaleString('ko-KR');
+        
+        document.getElementById('money').innerHTML = `${commaInteger}<span class="decimal-point">.${decimalPart}</span> 원`;
         document.getElementById('per-second-text').innerText = currentEarningsPerSecond.toFixed(4) + '원';
 
-        // 4. 입사 이후 총 경과 시간 계산
         const totalElapsedSeconds = (now - careerStart) / 1000;
         const days = Math.floor(totalElapsedSeconds / 86400);
         const hrs = Math.floor((totalElapsedSeconds % 86400) / 3600).toString().padStart(2, '0');
         const mins = Math.floor((totalElapsedSeconds % 3600) / 60).toString().padStart(2, '0');
         const secs = Math.floor(totalElapsedSeconds % 60).toString().padStart(2, '0');
 
-        document.getElementById('timer').innerHTML = `지방 공기업 근속: ${days}일 ${hrs}시간 ${mins}분 ${secs}초째<br>(${startYear}년 ${startMonth}월 1일 기준)`;
+        // 하단 안내 문구도 '회사 근속'으로 정돈
+        document.getElementById('timer').innerHTML = `회사 근속 기간: ${days}일 ${hrs}시간 ${mins}분 ${secs}초째<br>(${startYear}년 ${startMonth}월 ${startDay}일 기준)`;
     }
 </script>
 
