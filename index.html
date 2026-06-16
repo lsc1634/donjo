@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>리얼타임 출근 타이머 (KST 기준)</title>
+    <title>리얼타임 출근 타이머 (진짜 시급 기준)</title>
     <style>
         body {
             font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -106,7 +106,7 @@
     <!-- 현재까지 누적된 실시간 금액 -->
     <div class="money-display" id="money">0원</div>
     
-    <div class="sub-text">숨만 쉬어도 초당 <span style="color:#2e7d32; font-weight:bold;">1.14원</span> 획득 중</div>
+    <div class="sub-text">근무 시간 초당 <span style="color:#2e7d32; font-weight:bold;">3.62원</span> 획득 중</div>
     
     <!-- 휴게 시간 알림 (점심/저녁) -->
     <div id="status-message" class="lunch-badge" style="display: none;">현재 무급 휴게 시간입니다 (타이머 일시정지)</div>
@@ -116,9 +116,9 @@
 </div>
 
 <script>
-    // 유저님의 연간 세전 총액 기준 (36,019,720원)
-    // 36,019,720원 / 365일 / 24시간 / 3600초 = 약 1.14217원 (초당 가치)
-    const earningsPerSecond = 1.14217; 
+    // 유저님의 최종 통합 시급 반영 (13,037원)
+    // 13,037원 / 3600초 = 약 3.62139원 (초당 가치)
+    const earningsPerSecond = 3.62139; 
     
     let targetTime = null;
     let startHour = 9;
@@ -162,22 +162,18 @@
         // 1. 오전 출근 (12시 이전 출근) -> 점심시간(12~13시) 무급 처리
         if (startHour < 12) {
             if (now >= lunchStart && now < lunchEnd) {
-                // 현재 점심시간 진행 중인 경우 -> 12시 정각까지만 일한 것으로 고정
                 penaltySeconds = (now - lunchStart) / 1000;
                 isBreakTime = true;
             } else if (now >= lunchEnd) {
-                // 점심시간이 완전히 지난 경우 -> 통째로 1시간(3600초) 차감
                 penaltySeconds = 3600;
             }
         } 
         // 2. 오후 출근 (12시~17시 사이 출근) -> 저녁시간(17~18시) 무급 처리
         else if (startHour >= 12 && startHour < 17) {
             if (now >= dinnerStart && now < dinnerEnd) {
-                // 현재 저녁시간 진행 중인 경우 -> 17시 정각까지만 일한 것으로 고정
                 penaltySeconds = (now - dinnerStart) / 1000;
                 isBreakTime = true;
             } else if (now >= dinnerEnd) {
-                // 저녁시간이 완전히 지난 경우 -> 통째로 1시간(3600초) 차감
                 penaltySeconds = 3600;
             }
         }
@@ -194,7 +190,7 @@
             statusMsg.style.display = 'none';
         }
 
-        // 1. 누적 금액 표시
+        // 1. 실제 흐른 초에 초당 가치를 바로 곱하여 누적 오류 원천 차단
         const accumulatedMoney = realWorkingSeconds * earningsPerSecond;
         document.getElementById('money').innerText = accumulatedMoney.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 원';
 
